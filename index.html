@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>魔物巢穴 · 竖屏 demo</title>
+<style>
+  :root{
+    --bg:#0d0a0c;
+    --panel:#1d1719;
+    --panel2:#251d20;
+    --line:#4a3a3a;
+    --gold:#f4d046;
+    --text:#ece3d2;
+    --muted:#a2938a;
+    --red:#be4434;
+    --green:#7a9444;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;}
+  body{
+    margin:0; background:radial-gradient(circle at 50% 20%, #2a2026 0%, #0d0a0c 60%);
+    color:var(--text); overflow:hidden;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei","PingFang SC",sans-serif;
+  }
+  #viewer{position:fixed; inset:0; display:flex; align-items:center; justify-content:center;}
+  #stage{
+    width:390px; height:844px; flex:0 0 auto;
+    background:linear-gradient(180deg,#171214 0%,#100c0e 100%);
+    border-radius:18px; box-shadow:0 24px 80px rgba(0,0,0,.75), 0 0 0 1px #3a2f31;
+    overflow:hidden; display:flex; flex-direction:column;
+    transform-origin:center center; position:relative; user-select:none;
+  }
+  @media (max-width:420px){ #stage{border-radius:0; box-shadow:none;} }
+
+  .hdr{
+    padding:14px 16px 10px; display:flex; align-items:center; gap:10px;
+    background:linear-gradient(180deg,#241b1f 0%,rgba(36,27,31,0) 100%);
+    border-bottom:1px solid rgba(74,58,58,.5);
+  }
+  .hdr h1{font-size:19px; margin:0; letter-spacing:1px; font-weight:700; flex:1;}
+  .hdr h1 span{color:var(--gold);}
+  .icon-btn{
+    width:32px; height:32px; border-radius:9px; border:1px solid var(--line);
+    background:#2a2124; color:var(--text); font-size:15px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; font-family:inherit;
+  }
+  .icon-btn:active{transform:scale(.94);}
+  .icon-btn:focus-visible, button:focus-visible{outline:2px solid var(--gold); outline-offset:2px;}
+
+  .stats{display:flex; gap:8px; padding:0 16px 8px;}
+  .pill{
+    flex:1; background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    padding:7px 10px; display:flex; align-items:center; gap:7px; font-size:13px;
+  }
+  .pill .k{color:var(--muted); font-size:11px;}
+  .pill .v{font-weight:700; color:var(--gold); font-size:15px; margin-left:auto;}
+  .wave-preview{
+    margin:0 16px 8px; padding:6px 10px; border-radius:9px;
+    background:rgba(190,68,52,.10); border:1px dashed rgba(190,68,52,.45);
+    font-size:12px; color:#e7b9a8; display:flex; gap:6px; align-items:center;
+  }
+
+  .sec-title{padding:2px 16px 6px; font-size:12px; color:var(--muted); letter-spacing:.5px;}
+  .sec-title b{color:var(--text); font-size:13px;}
+
+  .rooms{display:grid; grid-template-columns:1fr 1fr; gap:8px; padding:0 16px;}
+  .slot{
+    height:80px; border-radius:12px; border:1px solid var(--line);
+    background:repeating-linear-gradient(135deg,#201a1c 0 6px,#1b1517 6px 12px);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;
+    cursor:pointer; position:relative; transition:border-color .15s, background .15s;
+    font-family:inherit; color:var(--text);
+  }
+  .slot.empty::after{content:"＋ 空地"; color:var(--muted); font-size:13px;}
+  .slot.empty.armed{border-color:var(--gold); background:rgba(244,208,70,.10);}
+  .slot.empty.armed::after{color:var(--gold);}
+  .slot.locked{opacity:.55; cursor:not-allowed;}
+  .slot.locked::after{content:"🔒 未解锁"; color:var(--muted); font-size:12px;}
+  .slot .emoji{font-size:26px; line-height:1;}
+  .slot .nm{font-size:12px; font-weight:600;}
+  .slot .st{font-size:10px; color:var(--muted);}
+  .slot .sell{position:absolute; top:4px; right:6px; font-size:9px; color:var(--muted); opacity:.75;}
+  .slot.occupied{border-color:#6b5a3f; background:linear-gradient(180deg,#2b2224,#221a1c);}
+  .slot.occupied:hover .sell{color:var(--gold);}
+
+  .shop{display:grid; grid-template-columns:1fr 1fr; gap:8px; padding:0 16px;}
+  .card{
+    border:1px solid var(--line); border-radius:12px; background:var(--panel);
+    padding:8px 10px; cursor:pointer; position:relative; text-align:left;
+    color:var(--text); font-family:inherit; transition:border-color .12s, transform .12s;
+  }
+  .card:active{transform:scale(.98);}
+  .card.sel{border-color:var(--gold); box-shadow:0 0 0 1px var(--gold), 0 0 14px rgba(244,208,70,.18);}
+  .card.poor{opacity:.45;}
+  .card .top{display:flex; align-items:center; gap:6px;}
+  .card .emoji{font-size:18px;}
+  .card .nm{font-size:13px; font-weight:600; flex:1;}
+  .card .cost{font-size:12px; color:var(--gold); font-weight:700;}
+  .card .desc{font-size:10px; color:var(--muted); margin-top:3px; line-height:1.35; min-height:26px;}
+  .card .stats{font-size:10px; color:#c9bba8; margin-top:2px;}
+
+  .action{padding:10px 16px 6px; margin-top:auto;}
+  .big-btn{
+    width:100%; border:none; border-radius:14px; padding:15px 12px;
+    background:linear-gradient(180deg,#f4d046,#c99a20); color:#241a08;
+    font-size:17px; font-weight:800; letter-spacing:1px; cursor:pointer; font-family:inherit;
+    box-shadow:0 6px 0 #7c5c0c, 0 10px 22px rgba(0,0,0,.45);
+  }
+  .big-btn:active{transform:translateY(3px); box-shadow:0 3px 0 #7c5c0c;}
+  .big-btn.secondary{
+    background:linear-gradient(180deg,#3b2f2f,#2a2121); color:var(--gold);
+    box-shadow:0 4px 0 #161011; font-size:13px; padding:10px; letter-spacing:.5px;
+  }
+  .hint{font-size:11px; color:var(--muted); text-align:center; padding:8px 16px 10px; line-height:1.4;}
+
+  #toast{
+    position:absolute; left:50%; bottom:168px; transform:translateX(-50%) translateY(10px);
+    background:rgba(20,15,16,.96); border:1px solid var(--line); color:var(--text);
+    padding:8px 14px; border-radius:20px; font-size:12px; opacity:0; pointer-events:none;
+    transition:opacity .2s, transform .2s; white-space:nowrap; max-width:330px; z-index:40;
+  }
+  #toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+
+  .overlay{
+    position:absolute; inset:0; z-index:30; display:none; flex-direction:column;
+    background:rgba(9,6,8,.965); backdrop-filter:blur(3px);
+  }
+  .overlay.show{display:flex;}
+  .ov-hdr{padding:16px 18px 10px; display:flex; align-items:center; gap:10px;}
+  .ov-hdr h2{font-size:17px; margin:0; flex:1;}
+  .ov-body{flex:1; overflow-y:auto; padding:0 18px 10px; scrollbar-width:thin;}
+  .ov-foot{padding:12px 18px 18px; display:flex; gap:10px;}
+
+  .side-title{font-size:11px; color:var(--muted); margin:6px 0 6px; letter-spacing:.5px;}
+  .foes{display:grid; grid-template-columns:1fr 1fr; gap:6px;}
+  .foe{border:1px solid var(--line); border-radius:9px; background:#201a1c; padding:6px 8px; font-size:11px; transition:opacity .2s, filter .2s;}
+  .foe .row{display:flex; align-items:center; gap:5px;}
+  .foe .nm{flex:1; font-weight:600;}
+  .foe .hp{font-size:10px; color:var(--muted);}
+  .foe.dead{opacity:.35; filter:grayscale(1);}
+  .bar{height:4px; border-radius:2px; background:#3a2c2c; margin-top:4px; overflow:hidden;}
+  .bar i{display:block; height:100%; background:var(--red); width:100%; transition:width .22s;}
+  .guards{display:flex; gap:6px; flex-wrap:wrap;}
+  .guard{flex:1 1 60px; min-width:58px; border:1px solid #5a4a32; border-radius:9px; background:#241d1a; padding:5px 6px; text-align:center; transition:opacity .2s, filter .2s;}
+  .guard .emoji{font-size:17px; line-height:1.1;}
+  .guard .nm{font-size:10px; margin-top:1px; color:#d8cbb4;}
+  .guard .bar i{background:var(--green);}
+  .guard.dead{opacity:.3; filter:grayscale(1);}
+  .empty-nest{font-size:12px; color:var(--muted); padding:8px; border:1px dashed var(--line); border-radius:9px; width:100%; text-align:center;}
+  .battle-log{
+    margin-top:8px; border:1px solid var(--line); border-radius:10px; background:#161113;
+    padding:8px 10px; height:264px; overflow-y:auto; font-size:11.5px; line-height:1.65;
+  }
+  /* battle screen: let the log take the remaining height of the overlay */
+  #battle .ov-body{display:flex; flex-direction:column; overflow:hidden; padding-bottom:16px;}
+  #battle .battle-log{flex:1; height:auto; min-height:160px;}
+  .battle-log .ln{opacity:0; transform:translateY(3px); animation:lnin .18s forwards;}
+  @keyframes lnin{to{opacity:1; transform:none;}}
+  .battle-log .ln.d{color:#c9d69e;}
+  .battle-log .ln.a{color:#e8b39f;}
+  .battle-log .ln.trap{color:#e8c46a;}
+  .battle-log .ln.kill{color:#ff8b7a; font-weight:600;}
+  .battle-log .ln.info{color:var(--muted);}
+  .battle-log .ln.win{color:var(--gold); font-weight:700;}
+  .battle-log .ln.lose{color:#ff7a68; font-weight:700;}
+
+  .result{position:absolute; inset:0; z-index:35; display:none; align-items:center; justify-content:center; background:rgba(9,6,8,.97);}
+  .result.show{display:flex;}
+  .result-box{width:320px; border-radius:16px; border:1px solid #6b5a3f; background:linear-gradient(180deg,#2a2124,#1a1416); padding:20px 18px; text-align:center; box-shadow:0 24px 70px rgba(0,0,0,.6);}
+  .result-box .big{font-size:46px; line-height:1; margin-bottom:8px;}
+  .result-box h3{margin:0 0 6px; font-size:20px;}
+  .result-box .sub{font-size:12px; color:var(--muted); margin-bottom:12px;}
+  .loot{text-align:left; border:1px dashed rgba(244,208,70,.4); border-radius:10px; padding:10px 12px; margin:0 0 14px; font-size:12.5px; line-height:1.7; background:rgba(244,208,70,.05);}
+  .loot .gold{color:var(--gold); font-weight:700;}
+  .result-box .btn{width:100%; border:none; border-radius:12px; padding:13px; cursor:pointer; background:linear-gradient(180deg,#f4d046,#c99a20); color:#241a08; font-size:15px; font-weight:800; font-family:inherit; box-shadow:0 5px 0 #7c5c0c;}
+  .result-box .btn:active{transform:translateY(2px); box-shadow:0 2px 0 #7c5c0c;}
+
+  .help-body{font-size:13px; line-height:1.85;}
+  .help-body h3{font-size:13px; color:var(--gold); margin:14px 0 4px;}
+  .help-body ul{margin:0; padding-left:20px;}
+  .help-body code{background:#2a2124; padding:1px 5px; border-radius:4px; font-size:12px;}
+</style>
+</head>
+<body>
+<div id="viewer">
+  <div id="stage" role="application" aria-label="魔物巢穴竖屏 demo">
+
+    <!-- ================= MAIN ================= -->
+    <div id="main">
+      <div class="hdr">
+        <h1>🏰 魔物<span>巢穴</span></h1>
+        <button class="icon-btn" id="btn-help" aria-label="帮助">❓</button>
+        <button class="icon-btn" id="btn-reset" aria-label="重置存档">♻️</button>
+      </div>
+
+      <div class="stats">
+        <div class="pill"><span class="k">金币</span><span class="v" id="s-gold">15</span></div>
+        <div class="pill"><span class="k">已守</span><span class="v" id="s-wave">0</span><span style="font-size:11px;color:var(--muted)">波</span></div>
+        <div class="pill"><span class="k">房间</span><span class="v" id="s-slots">3/5</span></div>
+      </div>
+
+      <div class="wave-preview" id="wave-preview">下一波：—</div>
+
+      <div class="sec-title"><b>巢穴房间</b> · 点击空房间放置已选商品</div>
+      <div class="rooms" id="rooms"></div>
+
+      <div class="sec-title" style="padding-top:10px"><b>商店</b> · 先选商品，再点房间</div>
+      <div class="shop" id="shop"></div>
+
+      <div class="action">
+        <button class="big-btn" id="btn-night">🌙 过夜 · 放冒险者进来</button>
+        <button class="big-btn secondary" id="btn-expand" style="margin-top:8px">🏗️ 扩建巢穴</button>
+      </div>
+      <div class="hint">① 买魔物/陷阱 → ② 点空房间放置 → ③ 点「过夜」看自动战斗 → ④ 用战利品扩建巢穴。点已放置的守卫可拆除（返还一半）。</div>
+    </div>
+
+    <!-- ================= BATTLE ================= -->
+    <div class="overlay" id="battle">
+      <div class="ov-hdr">
+        <h2 id="battle-title">🌙 第 1 波 · 冒险者来袭</h2>
+        <button class="icon-btn" id="btn-skip" aria-label="跳过战斗动画">⏭</button>
+      </div>
+      <div class="ov-body">
+        <div class="side-title">冒险者小队</div>
+        <div class="foes" id="foes"></div>
+        <div class="side-title" style="margin-top:10px">你的巢穴守卫</div>
+        <div class="guards" id="guards"></div>
+        <div class="battle-log" id="battle-log" aria-live="polite"></div>
+      </div>
+    </div>
+
+    <!-- ================= RESULT ================= -->
+    <div class="result" id="result">
+      <div class="result-box">
+        <div class="big" id="r-emoji">🎉</div>
+        <h3 id="r-title">守住了！</h3>
+        <div class="sub" id="r-sub"></div>
+        <div class="loot" id="r-loot"></div>
+        <button class="btn" id="btn-result">收下战利品 · 继续</button>
+      </div>
+    </div>
+
+    <!-- ================= HELP ================= -->
+    <div class="overlay" id="help">
+      <div class="ov-hdr"><h2>❓ 30 秒玩法</h2><button class="icon-btn" id="btn-help-close" aria-label="关闭">✕</button></div>
+      <div class="ov-body help-body">
+        <h3>目标</h3>
+        <p style="margin:0">摆好魔物和陷阱，守住一波波冒险者，用战利品把巢穴越扩越大。</p>
+        <h3>操作（3 步）</h3>
+        <ul>
+          <li>在<b>商店</b>点一个商品（高亮 = 已选中）</li>
+          <li>点一个<b>空房间</b>把它放进去</li>
+          <li>点 <b>🌙 过夜</b>，冒险者小队会自动来打你</li>
+        </ul>
+        <h3>规则</h3>
+        <ul>
+          <li>守住一波 → 拿金币战利品；失守 → 损失 25% 金币，重打本波</li>
+          <li>回合制自动战斗：守卫先手，每轮按房间顺序出手</li>
+          <li>陷阱在开战时先打最前面的冒险者 5 点</li>
+          <li>点已放置的守卫可拆除，返还一半金币</li>
+          <li>金币够可「扩建巢穴」，最多 5 间房</li>
+        </ul>
+        <h3>说明</h3>
+        <p style="margin:0">1–2 天可玩 demo：色块 + emoji 占位，无登录/付费/联网存档；进度只存本机 <code>localStorage</code>，可用 ♻️ 重置。</p>
+        <p style="margin:10px 0 0; color:var(--muted); font-size:11.5px">魔物巢穴 demo v1 · DeepSeek · 2026-10-23</p>
+      </div>
+      <div class="ov-foot"><button class="big-btn" id="btn-help-start">知道了，开玩</button></div>
+    </div>
+
+    <!-- ================= EXPAND ================= -->
+    <div class="overlay" id="expand-ov">
+      <div class="ov-hdr"><h2>🏗️ 扩建巢穴</h2><button class="icon-btn" id="btn-expand-close" aria-label="关闭">✕</button></div>
+      <div class="ov-body help-body">
+        <p>扩建可以多一间房，放更多守卫。</p>
+        <p style="font-size:15px">费用：<b style="color:var(--gold)" id="expand-cost">40</b> 金币　→　房间 <b id="expand-from">3</b> → <b id="expand-to">4</b></p>
+        <p style="color:var(--muted); font-size:12px">当前金币：<span style="color:var(--gold)" id="expand-gold">0</span></p>
+      </div>
+      <div class="ov-foot">
+        <button class="big-btn secondary" id="btn-expand-cancel">再想想</button>
+        <button class="big-btn" id="btn-expand-confirm">确认扩建</button>
+      </div>
+    </div>
+
+    <div id="toast" role="status"></div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ============================ data ============================ */
+  var SAVE_KEY = "monster-nest-demo-v1";
+  var VERSION = 1;
+  var MAX_SLOTS = 5;
+  var EXPAND_COSTS = [40, 70];
+
+  var UNITS = {
+    slime:    {name:"史莱姆",  emoji:"🟢", cost:6,  hp:16, atk:1, def:1, desc:"便宜耐揍的肉盾", stats:"HP16 / ATK1 / DEF1"},
+    imp:      {name:"小恶魔",  emoji:"👹", cost:8,  hp:10, atk:3, def:0, desc:"输出主力，血薄", stats:"HP10 / ATK3 / DEF0"},
+    gargoyle: {name:"石像鬼",  emoji:"🗿", cost:14, hp:24, atk:2, def:2, desc:"能扛能打的大块头", stats:"HP24 / ATK2 / DEF2"},
+    spike:    {name:"尖刺陷阱", emoji:"🪤", cost:6,  hp:0,  atk:0, def:0, desc:"开战先对最前冒险者造成 5 点伤害", stats:"触发：-5 HP", trap:true}
+  };
+  var SHOP_ORDER = ["slime","imp","gargoyle","spike"];
+
+  var ROSTER = [
+    {name:"新手盗贼", emoji:"🗡️", hp:9,  atk:2, def:0},
+    {name:"人类剑士", emoji:"⚔️", hp:14, atk:3, def:1},
+    {name:"见习法师", emoji:"🔮", hp:10, atk:4, def:0},
+    {name:"矮人重甲", emoji:"🛡️", hp:22, atk:2, def:3},
+    {name:"精灵游侠", emoji:"🏹", hp:13, atk:4, def:0}
+  ];
+  var WAVE_GOLD = [18, 30, 45, 62, 80];
+
+  /* ============================ state ============================ */
+  var state = freshState();
+  var ui = {selected:null, resetArmed:false, resetTimer:null, toastTimer:null, currentBattle:null, finishBattle:null};
+
+  function freshState(){
+    return {version:VERSION, gold:15, wave:0, slots:3, units:[null,null,null,null,null]};
+  }
+  function loadState(){
+    try{
+      var raw = localStorage.getItem(SAVE_KEY);
+      if(!raw) return null;
+      var s = JSON.parse(raw);
+      if(!s || s.version !== VERSION) return null;
+      s.gold = (typeof s.gold === "number" && isFinite(s.gold) && s.gold >= 0) ? Math.floor(s.gold) : 15;
+      s.wave = (typeof s.wave === "number" && isFinite(s.wave) && s.wave >= 0) ? Math.floor(s.wave) : 0;
+      s.slots = (typeof s.slots === "number") ? Math.max(3, Math.min(MAX_SLOTS, Math.floor(s.slots))) : 3;
+      if(!Array.isArray(s.units)) s.units = [];
+      var units = [];
+      for(var i=0;i<MAX_SLOTS;i++){
+        var k = s.units[i];
+        units.push((i < s.slots && k && UNITS[k]) ? k : null);
+      }
+      s.units = units;
+      return s;
+    }catch(e){ return null; }
+  }
+  function saveState(){
+    try{ localStorage.setItem(SAVE_KEY, JSON.stringify(state)); }catch(e){}
+  }
+
+  /* ============================ helpers ============================ */
+  function $(id){ return document.getElementById(id); }
+  function el(tag, cls, text){
+    var n = document.createElement(tag);
+    if(cls) n.className = cls;
+    if(text !== undefined) n.textContent = text;
+    return n;
+  }
+  function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
+  function aliveHp(arr){ return arr.some(function(h){ return h > 0; }); }
+
+  function waveGold(n){
+    if(n <= WAVE_GOLD.length) return WAVE_GOLD[n-1];
+    return WAVE_GOLD[WAVE_GOLD.length-1] + (n - WAVE_GOLD.length) * 20;
+  }
+  function makeParty(n){
+    var idx;
+    if(n === 1) idx = [0];
+    else if(n === 2) idx = [1,2];
+    else if(n === 3) idx = [1,2,0];
+    else if(n === 4) idx = [1,2,0,3];
+    else idx = [1,2,0,3,4];
+    var scale = Math.max(0, n - 3);
+    var hpMul = 1 + 0.12 * scale;
+    var atkAdd = Math.floor(scale / 2);
+    return idx.map(function(i){
+      var b = ROSTER[i];
+      var hp = Math.round(b.hp * hpMul);
+      return {name:b.name, emoji:b.emoji, maxHp:hp, hp:hp, atk:b.atk + atkAdd, def:b.def};
+    });
+  }
+  function partyLabel(n){
+    return makeParty(n).map(function(a){ return a.emoji + a.name; }).join(" + ");
+  }
+  function rollLoot(n){
+    var base = waveGold(n);
+    var items = [];
+    var r = Math.random();
+    if(r < 0.35) items.push({name:"碎裂魔晶", emoji:"💎", gold:6});
+    else if(r < 0.6) items.push({name:"冒险者干粮", emoji:"🍖", gold:4});
+    else if(r < 0.8) items.push({name:"旧铜币袋", emoji:"👛", gold:8});
+    var bonus = items.reduce(function(s,it){ return s + it.gold; }, 0);
+    return {base:base, items:items, total:base + bonus};
+  }
+
+  /* ============================ battle simulation ============================ */
+  function simulateBattle(){
+    var waveNo = state.wave + 1;
+    var party = makeParty(waveNo);
+    var guards = [];
+    for(var i=0;i<MAX_SLOTS;i++){
+      var kind = state.units[i];
+      if(!kind) continue;
+      var d = UNITS[kind];
+      guards.push({slot:i, kind:kind, name:d.name, emoji:d.emoji, trap:!!d.trap,
+                   maxHp:d.hp, atk:d.atk, def:d.def});
+    }
+    var partyHp = party.map(function(a){ return a.hp; });
+    var guardHp = guards.map(function(g){ return g.maxHp; });
+    var lines = [];
+
+    function snap(){ return {party:partyHp.slice(), guards:guardHp.slice()}; }
+    function push(t, text){ lines.push({t:t, text:text, snap:snap()}); }
+
+    push("info", "🌙 第 " + waveNo + " 波冒险者闯了进来！");
+
+    if(!guards.length){
+      push("lose", "💥 巢穴里一个守卫都没有，冒险者大摇大摆地走了进去…");
+      return {waveNo:waveNo, party:party, guards:guards, lines:lines, win:false, loot:null};
+    }
+
+    // 1) traps trigger: each trap hits the front-most living adventurer
+    guards.forEach(function(g){
+      if(!g.trap) return;
+      var ti = -1;
+      for(var i=0;i<party.length;i++){ if(partyHp[i] > 0){ ti = i; break; } }
+      if(ti < 0) return;
+      partyHp[ti] = Math.max(0, partyHp[ti] - 5);
+      push("trap", "🪤 " + g.name + " 触发！" + party[ti].emoji + party[ti].name + " -5 HP（" + partyHp[ti] + "/" + party[ti].maxHp + "）");
+      if(partyHp[ti] === 0) push("kill", "💀 " + party[ti].emoji + party[ti].name + " 倒下了！");
+    });
+
+    // 2) rounds: guards act, then adventurers act, in slot order
+    var round = 0;
+    while(round < 30){
+      round++;
+      // guards
+      for(var gi=0; gi<guards.length; gi++){
+        var g = guards[gi];
+        if(g.trap || guardHp[gi] <= 0) continue;
+        var ti = -1;
+        for(var i=0;i<party.length;i++){ if(partyHp[i] > 0){ ti = i; break; } }
+        if(ti < 0) break;
+        var dmg = Math.max(1, g.atk - party[ti].def);
+        partyHp[ti] = Math.max(0, partyHp[ti] - dmg);
+        push("d", g.emoji + g.name + " 攻击 " + party[ti].emoji + party[ti].name + "，造成 " + dmg + " 伤害（" + partyHp[ti] + "/" + party[ti].maxHp + "）");
+        if(partyHp[ti] === 0) push("kill", "💀 " + party[ti].emoji + party[ti].name + " 倒下了！");
+      }
+      // adventurers
+      for(var pi=0; pi<party.length; pi++){
+        if(partyHp[pi] <= 0) continue;
+        var chosen = -1;
+        for(var s2=0; s2<guards.length; s2++){
+          if(!guards[s2].trap && guardHp[s2] > 0){ chosen = s2; break; }
+        }
+        if(chosen < 0) break;
+        var gch = guards[chosen];
+        var dmg2 = Math.max(1, party[pi].atk - gch.def);
+        guardHp[chosen] = Math.max(0, guardHp[chosen] - dmg2);
+        push("a", party[pi].emoji + party[pi].name + " 反击 " + gch.emoji + gch.name + "，造成 " + dmg2 + " 伤害（" + guardHp[chosen] + "/" + gch.maxHp + "）");
+        if(guardHp[chosen] === 0) push("kill", "💀 你的 " + gch.emoji + gch.name + " 被击倒！");
+      }
+      if(!aliveHp(partyHp) || !aliveHp(guardHp)) break;
+    }
+
+    var win = !aliveHp(partyHp) && aliveHp(guardHp);
+    if(win){
+      var loot = rollLoot(waveNo);
+      push("win", "🎉 冒险者全灭！巢穴守住了，战利品 +" + loot.total + " 金币。");
+      return {waveNo:waveNo, party:party, guards:guards, lines:lines, win:true, loot:loot};
+    }
+    push("lose", "💥 守卫全灭，冒险者冲进了巢穴，抢走了一些金币…");
+    return {waveNo:waveNo, party:party, guards:guards, lines:lines, win:false, loot:null};
+  }
+
+  /* ============================ render main ============================ */
+  function renderMain(){
+    $("s-gold").textContent = state.gold;
+    $("s-wave").textContent = state.wave;
+    $("s-slots").textContent = state.slots + "/" + MAX_SLOTS;
+    $("wave-preview").textContent = "下一波：" + partyLabel(state.wave + 1) + " · 预计战利品 💰" + waveGold(state.wave + 1);
+
+    var rooms = $("rooms");
+    rooms.innerHTML = "";
+    for(var i=0;i<MAX_SLOTS;i++){
+      (function(i){
+        var b = document.createElement("button");
+        b.className = "slot";
+        b.setAttribute("data-slot", String(i));
+        if(i >= state.slots){
+          b.classList.add("locked");
+          b.disabled = true;
+        }else if(!state.units[i]){
+          b.classList.add("empty");
+          if(ui.selected) b.classList.add("armed");
+          b.setAttribute("aria-label", "空房间 " + (i+1) + "，放置已选守卫");
+          b.addEventListener("click", function(){ placeUnit(i); });
+        }else{
+          var kind = state.units[i], u = UNITS[kind];
+          b.classList.add("occupied");
+          b.setAttribute("aria-label", u.name + "，点击拆除并返还一半金币");
+          b.appendChild(el("div","emoji",u.emoji));
+          b.appendChild(el("div","nm",u.name));
+          b.appendChild(el("div","st", u.trap ? u.stats : ("HP" + u.hp + " · ATK" + u.atk)));
+          b.appendChild(el("div","sell","拆除"));
+          b.addEventListener("click", function(){ sellUnit(i); });
+        }
+        rooms.appendChild(b);
+      })(i);
+    }
+
+    var shop = $("shop");
+    shop.innerHTML = "";
+    SHOP_ORDER.forEach(function(kind){
+      var u = UNITS[kind];
+      var c = document.createElement("button");
+      c.className = "card";
+      c.setAttribute("data-card", kind);
+      if(ui.selected === kind) c.classList.add("sel");
+      if(state.gold < u.cost) c.classList.add("poor");
+      c.setAttribute("aria-label", u.name + "，价格 " + u.cost + " 金币");
+      var top = el("div","top");
+      top.appendChild(el("span","emoji",u.emoji));
+      top.appendChild(el("span","nm",u.name));
+      top.appendChild(el("span","cost","💰" + u.cost));
+      c.appendChild(top);
+      c.appendChild(el("div","desc",u.desc));
+      c.appendChild(el("div","stats",u.stats));
+      c.addEventListener("click", function(){ selectKind(kind); });
+      shop.appendChild(c);
+    });
+
+    var eb = $("btn-expand");
+    if(state.slots >= MAX_SLOTS){
+      eb.style.display = "none";
+    }else{
+      eb.style.display = "";
+      var cost = EXPAND_COSTS[state.slots - 3];
+      eb.textContent = "🏗️ 扩建巢穴 · 解锁第 " + (state.slots + 1) + " 间房（" + cost + " 金币）";
+      eb.disabled = state.gold < cost;
+      eb.style.opacity = state.gold < cost ? .6 : 1;
+    }
+  }
+
+  /* ============================ main actions ============================ */
+  function selectKind(kind){
+    var u = UNITS[kind];
+    if(state.gold < u.cost){ toast("金币不够，先守住一波再说"); return; }
+    ui.selected = (ui.selected === kind) ? null : kind;
+    renderMain();
+  }
+  function placeUnit(i){
+    if(!ui.selected){ toast("先在下方商店选一个商品"); return; }
+    var kind = ui.selected, u = UNITS[kind];
+    if(state.gold < u.cost){ toast("金币不够"); return; }
+    state.gold -= u.cost;
+    state.units[i] = kind;
+    ui.selected = null;
+    saveState(); renderMain();
+    toast(u.emoji + u.name + " 已入住 " + (i+1) + " 号房");
+  }
+  function sellUnit(i){
+    var kind = state.units[i];
+    if(!kind) return;
+    var u = UNITS[kind];
+    var refund = Math.floor(u.cost / 2);
+    state.units[i] = null;
+    state.gold += refund;
+    saveState(); renderMain();
+    toast("已拆除 " + u.emoji + u.name + "，返还 💰" + refund);
+  }
+
+  /* ============================ battle UI ============================ */
+  function startNight(){
+    var battle = simulateBattle();
+    ui.currentBattle = battle;
+    hideToast();
+    $("battle-title").textContent = "🌙 第 " + battle.waveNo + " 波 · 冒险者来袭";
+    $("r-emoji").textContent = "🎉";
+    $("r-title").textContent = "守住了！";
+    $("r-sub").textContent = "";
+    $("r-loot").innerHTML = "";
+    $("result").classList.remove("show");
+
+    var foes = $("foes"); foes.innerHTML = "";
+    battle.party.forEach(function(a, i){
+      var d = el("div","foe");
+      d.setAttribute("data-foe", String(i));
+      var row = el("div","row");
+      row.appendChild(el("span","",a.emoji));
+      row.appendChild(el("span","nm",a.name));
+      row.appendChild(el("span","hp",""));
+      d.appendChild(row);
+      var bar = el("div","bar"); bar.appendChild(el("i"));
+      d.appendChild(bar);
+      foes.appendChild(d);
+    });
+
+    var guards = $("guards"); guards.innerHTML = "";
+    if(!battle.guards.length){
+      guards.appendChild(el("div","empty-nest","（空巢，无守卫）"));
+    }else{
+      battle.guards.forEach(function(g, i){
+        var d = el("div","guard");
+        d.setAttribute("data-guard", String(i));
+        d.appendChild(el("div","emoji",g.emoji));
+        d.appendChild(el("div","nm",g.name));
+        if(!g.trap){
+          var bar = el("div","bar"); bar.appendChild(el("i"));
+          d.appendChild(bar);
+        }
+        guards.appendChild(d);
+      });
+    }
+
+    var log = $("battle-log"); log.innerHTML = "";
+    $("battle").classList.add("show");
+    applyHp(battle, 0);
+
+    var idx = 0;
+    var timers = [];
+    function finish(){
+      timers.forEach(function(t){ clearTimeout(t); });
+      timers.length = 0;
+      ui.finishBattle = null;
+      showResult(battle);
+    }
+    function step(){
+      if(idx >= battle.lines.length){ finish(); return; }
+      var line = battle.lines[idx];
+      idx++;
+      applyHp(battle, idx);
+      log.appendChild(el("div","ln " + line.t, line.text));
+      log.scrollTop = log.scrollHeight;
+      timers.push(setTimeout(step, line.t === "info" ? 460 : 210));
+    }
+    ui.finishBattle = finish;
+    step();
+  }
+
+  function applyHp(battle, upto){
+    var snap = (upto <= 0)
+      ? {party: battle.party.map(function(a){ return a.maxHp; }),
+         guards: battle.guards.map(function(g){ return g.maxHp; })}
+      : battle.lines[upto - 1].snap;
+
+    var foeNodes = $("foes").children;
+    for(var i=0;i<battle.party.length;i++){
+      var a = battle.party[i], hp = snap.party[i], node = foeNodes[i];
+      if(!node) continue;
+      node.querySelector(".hp").textContent = hp + "/" + a.maxHp;
+      node.querySelector(".bar i").style.width = clamp(hp / a.maxHp * 100, 0, 100) + "%";
+      node.classList.toggle("dead", hp <= 0);
+    }
+    var guardNodes = $("guards").children;
+    for(var j=0;j<battle.guards.length;j++){
+      var g = battle.guards[j], nodeG = guardNodes[j];
+      if(!nodeG || g.trap) continue;
+      var hp2 = snap.guards[j];
+      nodeG.querySelector(".bar i").style.width = clamp(hp2 / g.maxHp * 100, 0, 100) + "%";
+      nodeG.classList.toggle("dead", hp2 <= 0);
+    }
+  }
+
+  function showResult(battle){
+    hideToast();
+    var win = battle.win;
+    $("r-emoji").textContent = win ? "🎉" : "💥";
+    $("r-title").textContent = win ? "守住了！" : "巢穴被攻破…";
+    var loot = $("r-loot"); loot.innerHTML = "";
+    if(win){
+      $("r-sub").textContent = "第 " + battle.waveNo + " 波冒险者全灭";
+      var l1 = el("div","");
+      l1.appendChild(el("span","gold","💰 战利品金币 +" + battle.loot.total));
+      loot.appendChild(l1);
+      battle.loot.items.forEach(function(it){
+        loot.appendChild(el("div","", it.emoji + " " + it.name + "（+" + it.gold + " 金币）"));
+      });
+      $("btn-result").textContent = "收下战利品 · 继续";
+    }else{
+      var penalty = Math.min(state.gold, Math.ceil(state.gold * 0.25));
+      $("r-sub").textContent = "本波失守，损失 " + penalty + " 金币，可重打本波";
+      loot.appendChild(el("div","", "🌙 巢穴损伤：-" + penalty + " 金币"));
+      if(!battle.guards.length) loot.appendChild(el("div","", "提示：先去商店放几个守卫再「过夜」"));
+      $("btn-result").textContent = "修整一下 · 继续";
+    }
+    $("result").classList.add("show");
+  }
+
+  function onResultClick(){
+    var battle = ui.currentBattle;
+    if(!battle) return;
+    if(battle.win){
+      state.gold += battle.loot.total;
+      state.wave += 1;
+    }else{
+      state.gold -= Math.min(state.gold, Math.ceil(state.gold * 0.25));
+    }
+    ui.currentBattle = null;
+    saveState();
+    $("result").classList.remove("show");
+    $("battle").classList.remove("show");
+    renderMain();
+    if(battle.win && state.slots < MAX_SLOTS && state.gold >= EXPAND_COSTS[state.slots - 3]){
+      toast("金币够了！可以扩建巢穴了 🏗️");
+    }
+  }
+
+  /* ============================ expand / reset ============================ */
+  function openExpand(){
+    if(state.slots >= MAX_SLOTS) return;
+    var cost = EXPAND_COSTS[state.slots - 3];
+    $("expand-cost").textContent = cost;
+    $("expand-from").textContent = state.slots;
+    $("expand-to").textContent = state.slots + 1;
+    $("expand-gold").textContent = state.gold;
+    $("btn-expand-confirm").disabled = state.gold < cost;
+    $("btn-expand-confirm").style.opacity = state.gold < cost ? .5 : 1;
+    $("expand-ov").classList.add("show");
+  }
+  function closeExpand(){ $("expand-ov").classList.remove("show"); }
+  function confirmExpand(){
+    if(state.slots >= MAX_SLOTS) return;
+    var cost = EXPAND_COSTS[state.slots - 3];
+    if(state.gold < cost){ toast("金币不够扩建"); closeExpand(); return; }
+    state.gold -= cost;
+    state.slots += 1;
+    saveState(); renderMain(); closeExpand();
+    toast("🏗️ 扩建完成！第 " + state.slots + " 间房已解锁");
+  }
+  function tapReset(){
+    if(!ui.resetArmed){
+      ui.resetArmed = true;
+      $("btn-reset").textContent = "❗";
+      toast("再点一次确认重置（进度会清空）");
+      clearTimeout(ui.resetTimer);
+      ui.resetTimer = setTimeout(function(){
+        ui.resetArmed = false;
+        $("btn-reset").textContent = "♻️";
+      }, 3200);
+      return;
+    }
+    clearTimeout(ui.resetTimer);
+    ui.resetArmed = false;
+    $("btn-reset").textContent = "♻️";
+    state = freshState();
+    ui.selected = null;
+    try{ localStorage.removeItem(SAVE_KEY); }catch(e){}
+    saveState(); renderMain();
+    toast("已重置，重新开始");
+  }
+
+  /* ============================ misc UI ============================ */
+  function toast(msg){
+    var t = $("toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    clearTimeout(ui.toastTimer);
+    ui.toastTimer = setTimeout(function(){ t.classList.remove("show"); }, 2200);
+  }
+  function hideToast(){
+    clearTimeout(ui.toastTimer);
+    $("toast").classList.remove("show");
+  }
+
+  /* ============================ stage scaling ============================ */
+  function fitStage(){
+    var s = Math.min(window.innerWidth / 390, window.innerHeight / 844);
+    $("stage").style.transform = "scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitStage);
+  window.addEventListener("orientationchange", function(){ setTimeout(fitStage, 80); });
+  if(window.visualViewport){ window.visualViewport.addEventListener("resize", fitStage); }
+
+  /* ============================ bind ============================ */
+  $("btn-help").addEventListener("click", function(){ $("help").classList.add("show"); });
+  $("btn-help-close").addEventListener("click", function(){ $("help").classList.remove("show"); });
+  $("btn-help-start").addEventListener("click", function(){ $("help").classList.remove("show"); });
+  $("btn-reset").addEventListener("click", tapReset);
+  $("btn-night").addEventListener("click", startNight);
+  $("btn-skip").addEventListener("click", function(){ if(ui.finishBattle) ui.finishBattle(); });
+  $("btn-result").addEventListener("click", onResultClick);
+  $("btn-expand").addEventListener("click", openExpand);
+  $("btn-expand-close").addEventListener("click", closeExpand);
+  $("btn-expand-cancel").addEventListener("click", closeExpand);
+  $("btn-expand-confirm").addEventListener("click", confirmExpand);
+  document.addEventListener("keydown", function(e){
+    if(e.key === "Escape"){ $("help").classList.remove("show"); closeExpand(); }
+  });
+
+  /* ============================ boot ============================ */
+  var loaded = loadState();
+  if(loaded) state = loaded;
+  fitStage();
+  renderMain();
+  if(!loaded){ setTimeout(function(){ toast("第一次来？点 ❓ 看 30 秒玩法"); }, 700); }
+
+  // tiny debug hook: lets an external checker read state / simulate without UI clicks
+  window.__NEST__ = {
+    version: VERSION,
+    getState: function(){ return JSON.parse(JSON.stringify(state)); },
+    freshState: freshState,
+    makeParty: makeParty,
+    simulateBattle: simulateBattle
+  };
+})();
+</script>
+</body>
+</html>
